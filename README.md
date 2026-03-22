@@ -1,7 +1,6 @@
 # K4U1 - Movie Look Up
 
-Detta är ett robust REST API byggt i ASP.NET Core som integrerar mot TMDB och OMDb. 
-Projektet fokuserar på prestanda via HybridCache och resiliens via Polly.
+Detta är ett REST API byggt i ASP.NET Core som integrerar mot TMDB och OMDb. 
 
 ### Installation & Körning
 1. Klona repot: `git clone <din-url>`
