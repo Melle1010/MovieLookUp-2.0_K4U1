@@ -1,5 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Hybrid;
 using MovieLookUp.Data;
 using MovieLookUp.DTOs;
 using MovieLookUp.Models;
@@ -10,19 +12,22 @@ using static System.Net.WebRequestMethods;
 
 namespace MovieLookUp.Controllers
 {
-    [Route("api/[controller]")]
     [ApiController]
+    [Route("api/[controller]")]
+    [EnableRateLimiting("Fixed")]
     public class MoviesController : ControllerBase
     {
         private readonly AppDbContext _context;
         private readonly IHttpClientFactory _httpClientFactory;
         private readonly IConfiguration _configuration;
+        private readonly HybridCache _cache;
 
-        public MoviesController(AppDbContext context, IHttpClientFactory httpClientFactory, IConfiguration configuration)
+        public MoviesController(AppDbContext context, IHttpClientFactory httpClientFactory, IConfiguration configuration, HybridCache cache)
         {
             _context = context;
             _httpClientFactory = httpClientFactory;
             _configuration = configuration;
+            _cache = cache;
         }
 
         [HttpGet]
@@ -30,37 +35,46 @@ namespace MovieLookUp.Controllers
             [FromQuery] int page = 1,
             [FromQuery] int pageSize = 20)
         {
-            if (page < 1) page = 1;
-            if (pageSize < 1) pageSize = 1;
-            if (pageSize > 50) pageSize = 50;
+            string cacheKey = $"movies_page_{page}_size_{pageSize}";
 
-            var query = _context.Movies.AsQueryable();
+            var response = await _cache.GetOrCreateAsync(
+                cacheKey,
+                async cancelToken =>
+                {
+                    var query = _context.Movies.AsQueryable();
+                    var totalItems = await query.CountAsync(cancelToken);
+                    var totalPages = (int)Math.Ceiling(totalItems / (double)pageSize);
 
-            var totalItems = await query.CountAsync();
-            var totalPages = (int)Math.Ceiling(totalItems / (double)pageSize);
+                    var movies = await query
+                        .Skip((page - 1) * pageSize)
+                        .Take(pageSize)
+                        .ToListAsync(cancelToken);
 
-            var movies = await query
-                .Skip((page - 1) * pageSize)
-                .Take(pageSize)
-                .ToListAsync();
+                    var movieDtos = movies.Select(m => new MovieReadDto
+                    {
+                        Id = m.Id,
+                        Title = m.Title,
+                        Description = m.Description,
+                        Rating = m.Rating,
+                        ReleaseDate = m.ReleaseDate
+                    }).ToList();
 
-            var movieDtos = movies.Select(m => new MovieReadDto
-            {
-                Id = m.Id,
-                Title = m.Title,
-                Description = m.Description,
-                Rating = m.Rating,
-                ReleaseDate = m.ReleaseDate
-            }).ToList();
-
-            var response = new PagedResponse<MovieReadDto>
-            {
-                Items = movieDtos,
-                CurrentPage = page,
-                PageSize = pageSize,
-                TotalItems = totalItems,
-                TotalPages = totalPages
-            };
+                    return new PagedResponse<MovieReadDto>
+                    {
+                        Items = movieDtos,
+                        CurrentPage = page,
+                        PageSize = pageSize,
+                        TotalItems = totalItems,
+                        TotalPages = totalPages
+                    };
+                },
+                new HybridCacheEntryOptions
+                {
+                    Expiration = TimeSpan.FromMinutes(10),
+                    LocalCacheExpiration = TimeSpan.FromMinutes(10)
+                },
+                tags: ["movies-list"]
+            );
 
             return Ok(response);
         }
@@ -68,6 +82,7 @@ namespace MovieLookUp.Controllers
         [HttpGet("{id}", Name = "GetMovieById")]
         public async Task<ActionResult<MovieReadDto>> GetMovieById(int id)
         {
+            //throw new KeyNotFoundException("Filmen du letade efter finns inte i databasen.");
             var movie = await _context.Movies.FindAsync(id);
 
             if (movie == null)
@@ -160,6 +175,7 @@ namespace MovieLookUp.Controllers
 
             _context.Movies.Add(movieModel);
             await _context.SaveChangesAsync();
+            await _cache.RemoveByTagAsync("movies-list");
 
             var movieReadDto = new MovieReadDto
             {
