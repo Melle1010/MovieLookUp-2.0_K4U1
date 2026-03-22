@@ -16,18 +16,33 @@ namespace MovieLookUp.Controllers
     {
         private readonly AppDbContext _context;
         private readonly IHttpClientFactory _httpClientFactory;
-        private readonly string _apiKey = "887d56c3";
+        private readonly IConfiguration _configuration;
 
-        public MoviesController(AppDbContext context, IHttpClientFactory httpClientFactory)
+        public MoviesController(AppDbContext context, IHttpClientFactory httpClientFactory, IConfiguration configuration)
         {
             _context = context;
             _httpClientFactory = httpClientFactory;
+            _configuration = configuration;
         }
 
         [HttpGet]
-        public async Task<ActionResult<IEnumerable<MovieReadDto>>> GetAllMovies()
+        public async Task<ActionResult<PagedResponse<MovieReadDto>>> GetAllMovies(
+            [FromQuery] int page = 1,
+            [FromQuery] int pageSize = 20)
         {
-            var movies = await _context.Movies.ToListAsync();
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 1;
+            if (pageSize > 50) pageSize = 50;
+
+            var query = _context.Movies.AsQueryable();
+
+            var totalItems = await query.CountAsync();
+            var totalPages = (int)Math.Ceiling(totalItems / (double)pageSize);
+
+            var movies = await query
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
 
             var movieDtos = movies.Select(m => new MovieReadDto
             {
@@ -36,9 +51,18 @@ namespace MovieLookUp.Controllers
                 Description = m.Description,
                 Rating = m.Rating,
                 ReleaseDate = m.ReleaseDate
-            });
+            }).ToList();
 
-            return Ok(movieDtos);
+            var response = new PagedResponse<MovieReadDto>
+            {
+                Items = movieDtos,
+                CurrentPage = page,
+                PageSize = pageSize,
+                TotalItems = totalItems,
+                TotalPages = totalPages
+            };
+
+            return Ok(response);
         }
 
         [HttpGet("{id}", Name = "GetMovieById")]
@@ -92,7 +116,8 @@ namespace MovieLookUp.Controllers
         {
             var client = _httpClientFactory.CreateClient();
 
-            var omdbUrl = $"http://www.omdbapi.com/?t={Uri.EscapeDataString(searchDto.Title)}&apikey={_apiKey}";
+            var omdbKey = _configuration["ApiKeys:OMDb"];
+            var omdbUrl = $"http://www.omdbapi.com/?t={Uri.EscapeDataString(searchDto.Title)}&apikey={omdbKey}";
             var omdbData = await client.GetFromJsonAsync<OmdbMovieResponse>(omdbUrl);
 
             if (omdbData == null || omdbData.Response == "False")
@@ -102,7 +127,7 @@ namespace MovieLookUp.Controllers
 
             var tmdbUrl = $"https://api.themoviedb.org/3/search/movie?query={Uri.EscapeDataString(searchDto.Title)}";
 
-            var tmdbToken = "eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIyNzIzZmQyNzhkNmQ1Y2RjZTE3NWM0MTgzYWE3OTE3ZSIsIm5iZiI6MTc3MzYwMzQ1My43MzksInN1YiI6IjY5YjcwYTdkNTY1NGI0NzM0MzVhNzMwNyIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.rkW40Be2-LVBz2XzQxax42xn3tUSlZK44cwBgPtZ8z0";
+            var tmdbToken = _configuration["ApiKeys:TMDB"];
 
             client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", tmdbToken);
 

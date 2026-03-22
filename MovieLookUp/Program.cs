@@ -15,8 +15,8 @@ var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
 {
-    app.UseSwagger();   // Generates the 'swagger.json' file
-    app.UseSwaggerUI(); // Generates the visual webpage you interact with
+    app.UseSwagger();   
+    app.UseSwaggerUI();
 }
 
 app.UseHttpsRedirection();
