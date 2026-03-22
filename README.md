@@ -5,8 +5,7 @@ Detta är ett REST API byggt i ASP.NET Core som integrerar mot TMDB och OMDb.
 ### Installation & Körning
 1. Klona repot: `git clone <din-url>`
 2. Navigera till mappen: `cd K4U1`
-3. Återställ paket: `dotnet restore`
-4. Kör applikationen: `dotnet run`
+3. Kör applikationen: `dotnet run`
 
 API:et körs som standard på `https://localhost:7157/swagger` (eller den port som visas i terminalen).
 
