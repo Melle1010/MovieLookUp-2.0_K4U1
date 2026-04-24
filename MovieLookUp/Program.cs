@@ -4,6 +4,7 @@ using MovieLookUp.Data;
 using MovieLookUp.Middleware;
 using System.Threading.RateLimiting;
 using Microsoft.Extensions.Http.Resilience;
+using MovieLookUp.Extensions;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -12,6 +13,8 @@ builder.Services.AddHttpClient("MovieClient")
 
 builder.Services.AddControllers();
 builder.Services.AddSwaggerGen();
+
+builder.Services.AddCorsPolicy();
 
 builder.Services.AddRateLimiter(options =>
 {
