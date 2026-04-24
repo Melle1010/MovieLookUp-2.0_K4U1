@@ -13,8 +13,8 @@ API:et körs som standard på `https://localhost:7157/swagger` (eller den port s
 För att köra API:et behöver du sätta upp följande secrets lokalt:
 
 ```bash
-dotnet user-secrets set "ExternalApis:TmdbToken" "DIN_TMDB_TOKEN"
-dotnet user-secrets set "ExternalApis:OmdbApiKey" "DIN_OMDB_NYCKEL"
+dotnet user-secrets set "ApiKeys:TmdbToken" "DIN_TMDB_TOKEN"
+dotnet user-secrets set "ApiKeys:OmdbApiKey" "DIN_OMDB_NYCKEL"
 ```
 
 ## Prestandamätning
