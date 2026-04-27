@@ -82,7 +82,6 @@ namespace MovieLookUp.Controllers
         [HttpGet("{id}", Name = "GetMovieById")]
         public async Task<ActionResult<MovieReadDto>> GetMovieById(int id)
         {
-            //throw new KeyNotFoundException("Filmen du letade efter finns inte i databasen.");
             var movie = await _context.Movies.FindAsync(id);
 
             if (movie == null)
@@ -113,6 +112,7 @@ namespace MovieLookUp.Controllers
 
             _context.Movies.Add(movieModel);
             await _context.SaveChangesAsync();
+            await _cache.RemoveByTagAsync("movies-list");
 
             var movieReadDto = new MovieReadDto
             {
